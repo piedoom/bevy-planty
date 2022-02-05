@@ -1,0 +1,43 @@
+[package]
+name = "planty"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pl"
+
+[dependencies]
+bevy_polyline = "0.1"
+lazy_static = "1.4"
+regex = "1.5"
+anyhow = "1"
+thiserror = "1"
+smooth-bevy-cameras = "0.2"
+
+[dependencies.dcc-lsystem]
+version = "0.6"
+default_features = false
+
+[dependencies.ron]
+version = "0.7"
+
+[dependencies.serde]
+version = "1"
+default_features = true
+
+[dependencies.bevy]
+default_features = true
+version = "0.6"
+
+[dependencies.bevy_egui]
+branch = "main"
+git = "https://github.com/mvlabat/bevy_egui"
+
+[dependencies.rand]
+version = "*"
+
+[patch]
+[patch.crates-io]
+[patch.crates-io.bevy]
+branch = "main"
+git = "https://github.com/bevyengine/bevy"
