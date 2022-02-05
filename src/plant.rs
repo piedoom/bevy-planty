@@ -62,8 +62,10 @@ impl RenderState {
 }
 
 impl PlantRendererComponent {
-    pub fn generate_mesh(&mut self, actions: &[Action]) -> Vec<Vec3> {
+    pub fn generate_lines(&mut self, actions: &[Action]) -> Vec<Vec<Vec3>> {
         let (mut pos, mut rot) = self.state.cursor;
+
+        let mut lines = vec![];
         let mut verts = vec![];
 
         for action in actions {
@@ -88,11 +90,14 @@ impl PlantRendererComponent {
                         pos = new_pos;
                         rot = new_rot;
                     }
+                    // additionally, push the verts to our line. this is due to how polyline works
+                    lines.push(verts.drain(0..).collect());
+                    verts.push(pos);
                 }
             }
         }
         info!("{:?}", &verts);
-        verts
+        lines
     }
 }
 
@@ -124,16 +129,20 @@ fn solver_system(
         plant.structure.step_by(5);
         let instructions = plant.render_actions();
         // build lines
-        let vertices: Vec<Vec3> = render.generate_mesh(&instructions);
+        let lines: Vec<Vec<Vec3>> = render.generate_lines(&instructions);
 
-        cmd.entity(e).insert_bundle(PolylineBundle {
-            polyline: polylines.add(Polyline { vertices }),
-            material: polyline_materials.add(PolylineMaterial {
-                width: 3.0,
-                color: Color::GREEN,
-                perspective: false,
-            }),
-            ..Default::default()
+        cmd.entity(e).with_children(|c| {
+            for line in lines {
+                c.spawn_bundle(PolylineBundle {
+                    polyline: polylines.add(Polyline { vertices: line }),
+                    material: polyline_materials.add(PolylineMaterial {
+                        width: 3.0,
+                        color: Color::GREEN,
+                        perspective: false,
+                    }),
+                    ..Default::default()
+                });
+            }
         });
     });
 }
