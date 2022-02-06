@@ -28,7 +28,7 @@ default_features = true
 [dependencies.bevy]
 default_features = false
 version = "0.6"
-features = ["render", "x11", "bevy_winit", "bevy_gilrs"]
+features = ["render", "x11", "bevy_winit"]
 
 [dependencies.bevy_egui]
 branch = "main"
