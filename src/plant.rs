@@ -1,12 +1,6 @@
-use std::{
-    ops::DerefMut,
-    slice::{Iter, IterMut},
-};
-
 use bevy::{prelude::*, utils::HashMap};
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
 use dcc_lsystem::{ArenaId, LSystem, LSystemBuilder};
-use lazy_static::__Deref;
 use regex::Regex;
 
 pub struct PlantPlugin;

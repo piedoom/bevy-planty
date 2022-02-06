@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_egui::egui::{self, Align, Align2};
+use bevy_egui::egui;
 
 use crate::plant::*;
 pub struct UiPlugin;
@@ -11,18 +11,11 @@ impl Plugin for UiPlugin {
 }
 
 fn ui_system(
-    mut cmd: Commands,
     mut ctx: ResMut<bevy_egui::EguiContext>,
-    mut plants: Query<(
-        Entity,
-        &PlantComponent,
-        &mut RulesComponent,
-        &PlantBuilderComponent,
-        &mut PlantRendererComponent,
-    )>,
+    mut plants: Query<(&mut RulesComponent, &mut PlantRendererComponent), With<PlantComponent>>,
 ) {
     let mut i = 0;
-    plants.for_each_mut(|(entity, plant, mut rules, builder, mut render)| {
+    plants.for_each_mut(|(mut rules, mut render)| {
         i += 1;
         let mut rules_dirty = false;
         let mut render_dirty = false;
