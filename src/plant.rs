@@ -1,9 +1,24 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::DerefMut,
+    slice::{Iter, IterMut},
+};
 
 use bevy::{prelude::*, utils::HashMap};
 use bevy_polyline::{Polyline, PolylineBundle, PolylineMaterial};
 use dcc_lsystem::{ArenaId, LSystem, LSystemBuilder};
+use lazy_static::__Deref;
 use regex::Regex;
+
+pub struct PlantPlugin;
+
+impl Plugin for PlantPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_startup_system(setup_system)
+            .add_system(solver_system)
+            .add_system(update_dirty_system)
+            .add_system(update_plants_system);
+    }
+}
 
 #[derive(Component)]
 pub struct PlantComponent {
@@ -21,25 +36,42 @@ impl PlantComponent {
     }
 }
 
-#[derive(Component, Default)]
+#[derive(Component)]
 pub struct PlantRendererComponent {
     state: RenderState,
     pub options: RenderOptions,
+    dirty: bool,
+}
+
+impl Default for PlantRendererComponent {
+    fn default() -> Self {
+        Self {
+            state: Default::default(),
+            options: Default::default(),
+            dirty: true,
+        }
+    }
+}
+
+impl PlantRendererComponent {
+    pub fn dirty(&mut self) {
+        self.dirty = true;
+    }
 }
 
 #[derive(Component)]
 pub struct RenderOptions {
     /// Length of each segment
-    segment_length: f32,
-    /// Angle in radians for rotations
-    rotation_angle: f32,
+    pub segment_length: f32,
+    /// Angle IN DEGREES, NOT RADIANS for rotations
+    pub rotation_angle: f32,
 }
 
 impl Default for RenderOptions {
     fn default() -> Self {
         Self {
-            segment_length: 1.5f32,
-            rotation_angle: 20f32.to_radians(),
+            segment_length: 0.1f32,
+            rotation_angle: 20f32,
         }
     }
 }
@@ -78,7 +110,7 @@ impl PlantRendererComponent {
                     verts.push(pos);
                 }
                 Action::Rotate(r) => {
-                    let angle = self.options.rotation_angle
+                    let angle = self.options.rotation_angle.to_radians()
                         * if r == &Direction::Left { -1f32 } else { 1f32 };
                     rot *= Quat::from_euler(EulerRot::XYZ, angle * 2f32, angle, 0f32);
                 }
@@ -96,22 +128,7 @@ impl PlantRendererComponent {
                 }
             }
         }
-        info!("{:?}", &verts);
         lines
-    }
-}
-
-#[derive(Component, Default)]
-pub struct PlantBuilderComponent {
-    pub builder: LSystemBuilder,
-    pub tokens: HashMap<char, (ArenaId, Action)>,
-}
-pub struct PlantPlugin;
-
-impl Plugin for PlantPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_system)
-            .add_system(solver_system);
     }
 }
 
@@ -125,6 +142,8 @@ fn solver_system(
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
 ) {
     plants.for_each_mut(|(e, mut plant, mut render)| {
+        cmd.entity(e).despawn_descendants();
+
         // system.step_by() applies our production rule a number of times
         plant.structure.step_by(5);
         let instructions = plant.render_actions();
@@ -165,7 +184,7 @@ pub enum Direction {
 fn setup_system(mut cmd: Commands) {
     let mut builder = PlantBuilderComponent::default();
     builder
-        .tokens(&[
+        .set_tokens(&[
             ('X', Action::Nothing),
             ('F', Action::Forwards),
             ('+', Action::Rotate(Direction::Right)),
@@ -173,21 +192,27 @@ fn setup_system(mut cmd: Commands) {
             ('[', Action::Push),
             (']', Action::Pop),
         ])
-        .axiom(&['X'])
-        .unwrap()
-        .rules(&["X=F+[[X]-X]-F[-FX]+X", "F=FF"])
+        .set_axiom(&['X'])
         .unwrap();
 
-    let plant = builder.finish();
+    let plant = builder.generate();
     cmd.spawn()
         .insert(plant)
+        .insert(builder)
+        .insert(RulesComponent::new(&["X=F+[[X]-X]-F[-FX]+X", "F=FF"]))
         .insert(PlantRendererComponent::default());
+}
+
+#[derive(Component, Default)]
+pub struct PlantBuilderComponent {
+    builder: LSystemBuilder,
+    tokens: HashMap<char, (ArenaId, Action)>,
 }
 
 impl PlantBuilderComponent {
     /// Add a transformation rule to the builder.
     /// Panics if a necessary token is not found
-    pub fn rule<'a, S: Into<&'a str>>(&mut self, rule: S) -> anyhow::Result<&mut Self> {
+    pub fn add_rule<'a, S: Into<&'a str>>(&mut self, rule: S) -> anyhow::Result<&mut Self> {
         let rule = rule.into();
 
         lazy_static::lazy_static! {
@@ -210,32 +235,38 @@ impl PlantBuilderComponent {
         }
 
         // Add the rule to our builder
-        self.builder.transformation_rule(lhs, rule);
+        self.builder.transformation_rule(lhs, rule).ok();
         Ok(self)
     }
 
-    pub fn rules<'a, S: Into<&'a str> + Copy>(&mut self, rules: &[S]) -> anyhow::Result<&mut Self> {
+    pub fn set_rules<'a, S: Into<&'a str> + Clone>(
+        &mut self,
+        rules: &[S],
+    ) -> anyhow::Result<&mut Self> {
+        self.builder.rules.clear();
         for rule in rules {
-            let s: &'a str = (*rule).into();
-            self.rule(s)?;
+            let s: &'a str = (rule.clone()).into();
+            self.add_rule(s)?;
         }
         Ok(self)
     }
 
-    pub fn token(&mut self, token: char, action: Action) -> &mut Self {
+    pub fn add_token(&mut self, token: char, action: Action) -> &mut Self {
         self.tokens
-            .insert(token, (self.builder.token(token), action));
+            .insert(token, (self.builder.token(token).unwrap(), action));
         self
     }
 
-    pub fn tokens(&mut self, tokens: &[(char, Action)]) -> &mut Self {
+    pub fn set_tokens(&mut self, tokens: &[(char, Action)]) -> &mut Self {
+        self.builder = Default::default();
+        self.tokens = Default::default();
         for (token, action) in tokens {
-            self.token(*token, *action);
+            self.add_token(*token, *action);
         }
         self
     }
 
-    pub fn axiom(&mut self, tokens: &[char]) -> anyhow::Result<&mut Self> {
+    pub fn set_axiom(&mut self, tokens: &[char]) -> anyhow::Result<&mut Self> {
         let tokens: Vec<ArenaId> = tokens
             .iter()
             .map(|token| {
@@ -244,7 +275,7 @@ impl PlantBuilderComponent {
                     .0
             })
             .collect();
-        self.builder.axiom(tokens);
+        self.builder.axiom(tokens).ok();
         Ok(self)
     }
 
@@ -255,11 +286,94 @@ impl PlantBuilderComponent {
             .ok_or_else(|| anyhow::anyhow!("Could not get token with name {token}"))?)
     }
 
-    pub fn finish(&mut self) -> PlantComponent {
+    pub fn generate(&self) -> PlantComponent {
         let f = self.builder.clone();
         PlantComponent {
-            structure: f.finish(),
+            structure: f.finish().unwrap(),
             action_map: self.tokens.iter().map(|(c, (_, a))| (*c, *a)).collect(),
         }
     }
+}
+
+#[derive(Component)]
+pub struct RulesComponent {
+    rules: Vec<String>,
+    dirty: bool,
+}
+
+impl RulesComponent {
+    pub fn new(rules: &[&str]) -> Self {
+        Self {
+            rules: rules.iter().map(|x| String::from(*x)).collect(),
+            dirty: true,
+        }
+    }
+
+    pub fn dirty(&mut self) {
+        self.dirty = true
+    }
+}
+
+impl From<Vec<String>> for RulesComponent {
+    fn from(v: Vec<String>) -> Self {
+        Self {
+            rules: v,
+            dirty: true,
+        }
+    }
+}
+
+impl std::ops::Deref for RulesComponent {
+    type Target = Vec<String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.rules
+    }
+}
+
+impl std::ops::DerefMut for RulesComponent {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.rules
+    }
+}
+
+fn update_dirty_system(
+    mut settings: Query<(Entity, &mut RulesComponent, &mut PlantRendererComponent)>,
+    mut builders: Query<&mut PlantBuilderComponent>,
+) {
+    settings.for_each_mut(|(entity, mut rules, mut render)| {
+        // As we access this mutably, it is always marked as "changed"
+        // So, we need to manually mark as dirty when we actually change the value and cannot rely on Changed
+        if rules.dirty {
+            let new_rules: Vec<_> = rules.iter().map(String::as_str).collect();
+            if let Ok(mut builder) = builders.get_mut(entity) {
+                builder.set_rules(&new_rules).ok();
+            }
+            rules.dirty = false;
+        }
+
+        if render.dirty {
+            // Mark as changed manually
+            if let Ok(mut builder) = builders.get_mut(entity) {
+                builder.set_changed();
+            }
+
+            render.dirty = false;
+        }
+    });
+}
+
+fn update_plants_system(
+    mut plants: Query<
+        (&PlantBuilderComponent, &mut PlantComponent),
+        Changed<PlantBuilderComponent>,
+    >,
+) {
+    if !plants.is_empty() {
+        let len = plants.iter().count();
+        info!("Redraw requested for {} entities", len);
+    }
+    plants.for_each_mut(|(builder, mut plant)| {
+        *plant = builder.generate();
+    });
 }

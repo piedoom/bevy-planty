@@ -15,7 +15,7 @@ thiserror = "1"
 smooth-bevy-cameras = "0.2"
 
 [dependencies.dcc-lsystem]
-version = "0.6"
+git = "https://github.com/piedoom/dcc-lsystem"
 default_features = false
 
 [dependencies.ron]
@@ -26,8 +26,9 @@ version = "1"
 default_features = true
 
 [dependencies.bevy]
-default_features = true
+default_features = false
 version = "0.6"
+features = ["render", "x11", "bevy_winit", "bevy_gilrs"]
 
 [dependencies.bevy_egui]
 branch = "main"
@@ -41,3 +42,11 @@ version = "*"
 [patch.crates-io.bevy]
 branch = "main"
 git = "https://github.com/bevyengine/bevy"
+
+[target]
+[target."cfg(all(target_arch = \"wasm32\", target_os = \"unknown\"))"]
+[target."cfg(all(target_arch = \"wasm32\", target_os = \"unknown\"))".dependencies]
+futures = "0.3"
+gloo-events = "0.1"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window", "Document", "Element"] }
