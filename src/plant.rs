@@ -173,7 +173,7 @@ fn solver_system(
 
 #[inline(always)]
 fn get_color(percent: f32) -> Color {
-    Color::rgb(0., 1.0 - (percent * 0.5), 0.2 + (percent * 0.4))
+    Color::rgb(0., 1.0 - (percent * 0.3), 0.1 + (percent * 0.2))
 }
 
 #[derive(Clone, Copy)]

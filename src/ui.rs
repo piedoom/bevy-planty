@@ -22,9 +22,9 @@ fn ui_system(
     )>,
 ) {
     let mut i = 0;
-    let mut rules_dirty = false;
     plants.for_each_mut(|(entity, plant, mut rules, builder, mut render)| {
         i += 1;
+        let mut rules_dirty = false;
         let mut render_dirty = false;
         egui::Window::new(format!("Plant {i} settings"))
             .collapsible(false)
@@ -69,7 +69,9 @@ fn ui_system(
                                 .desired_width(f32::INFINITY),
                         );
                         let remove_button = ui.button("Remove rule");
-                        rules_dirty = text.changed() || remove_button.clicked();
+                        if text.changed() || remove_button.clicked() {
+                            rules_dirty = true;
+                        }
                     });
                     ui.separator();
                 }
