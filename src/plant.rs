@@ -65,6 +65,8 @@ pub struct RenderOptions {
     pub segment_length: f32,
     /// Angle IN DEGREES, NOT RADIANS for rotations
     pub rotation_angle: f32,
+    /// Store for how many iterations to apply
+    pub iterations: usize,
 }
 
 impl Default for RenderOptions {
@@ -72,6 +74,7 @@ impl Default for RenderOptions {
         Self {
             segment_length: 0.1f32,
             rotation_angle: 20f32,
+            iterations: 5,
         }
     }
 }
@@ -145,25 +148,32 @@ fn solver_system(
         cmd.entity(e).despawn_descendants();
 
         // system.step_by() applies our production rule a number of times
-        plant.structure.step_by(5);
+        plant.structure.step_by(render.options.iterations);
         let instructions = plant.render_actions();
         // build lines
-        let lines: Vec<Vec<Vec3>> = render.generate_lines(&instructions);
+        let mut lines: Vec<Vec<Vec3>> = render.generate_lines(&instructions);
 
         cmd.entity(e).with_children(|c| {
-            for line in lines {
+            let lines_len = lines.len();
+            for (i, line) in lines.drain(0..).enumerate() {
+                let normalized = i as f32 / lines_len as f32;
                 c.spawn_bundle(PolylineBundle {
                     polyline: polylines.add(Polyline { vertices: line }),
                     material: polyline_materials.add(PolylineMaterial {
-                        width: 3.0,
-                        color: Color::GREEN,
-                        perspective: false,
+                        width: 20.0 - (normalized * 10.0),
+                        color: get_color(normalized),
+                        perspective: true,
                     }),
                     ..Default::default()
                 });
             }
         });
     });
+}
+
+#[inline(always)]
+fn get_color(percent: f32) -> Color {
+    Color::rgb(0., 1.0 - (percent * 0.5), 0.2 + (percent * 0.4))
 }
 
 #[derive(Clone, Copy)]
