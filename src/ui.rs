@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_egui::egui;
 
-use crate::plant::*;
+use crate::{events::GameEvent, plant::*};
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
@@ -12,13 +12,12 @@ impl Plugin for UiPlugin {
 
 fn ui_system(
     mut ctx: ResMut<bevy_egui::EguiContext>,
-    mut plants: Query<(&mut RulesComponent, &mut PlantRendererComponent), With<PlantComponent>>,
+    mut plants: Query<(Entity, &mut OptionsComponent), With<PlantComponent>>,
+    mut events: EventWriter<GameEvent>,
 ) {
     let mut i = 0;
-    plants.for_each_mut(|(mut rules, mut render)| {
+    plants.for_each_mut(|(entity, mut values)| {
         i += 1;
-        let mut rules_dirty = false;
-        let mut render_dirty = false;
         egui::Window::new(format!("Plant {i} settings"))
             .collapsible(false)
             .default_pos(egui::Pos2::new(32., 32.))
@@ -27,13 +26,13 @@ fn ui_system(
                 ui.style_mut().spacing.slider_width = 300.;
                 // Show render settings
                 ui.label("Iterations");
-                let iterations = ui.add(egui::Slider::new(&mut render.options.iterations, 1..=9));
+                let iterations = ui.add(egui::Slider::new(&mut values.iterations, 1..=9));
 
                 ui.separator();
 
                 ui.label("Rotation angle");
                 let rot_angle = ui.add(
-                    egui::Slider::new(&mut render.options.rotation_angle, 0f32..=180f32)
+                    egui::Slider::new(&mut values.rotation_amount, 0f32..=180f32)
                         .max_decimals(2)
                         .smart_aim(false),
                 );
@@ -42,18 +41,27 @@ fn ui_system(
 
                 ui.label("Segment length");
                 let segment_length = ui.add(egui::Slider::new(
-                    &mut render.options.segment_length,
+                    &mut values.segment_length,
                     0.01f32..=0.2f32,
                 ));
 
-                render_dirty =
-                    rot_angle.changed() || segment_length.changed() || iterations.changed();
+                ui.separator();
+
+                ui.label("Axiom");
+                let axiom = ui.add(
+                    egui::TextEdit::multiline(&mut values.axiom)
+                        .code_editor()
+                        .desired_rows(1)
+                        .desired_width(f32::INFINITY),
+                );
 
                 ui.separator();
 
                 // Show rules text
                 ui.label("Rules");
-                for rule in rules.iter_mut() {
+                let mut rule_changed = false;
+                let mut to_remove = Vec::with_capacity(values.rules.len());
+                for (i, rule) in values.rules.iter_mut().enumerate() {
                     ui.vertical(|ui| {
                         let text = ui.add(
                             egui::TextEdit::multiline(rule)
@@ -62,22 +70,55 @@ fn ui_system(
                                 .desired_width(f32::INFINITY),
                         );
                         let remove_button = ui.button("Remove rule");
+                        if remove_button.clicked() {
+                            to_remove.push(i);
+                        }
                         if text.changed() || remove_button.clicked() {
-                            rules_dirty = true;
+                            rule_changed = true;
                         }
                     });
                     ui.separator();
                 }
-                if ui.button("Add rule").clicked() {
-                    rules.push(Default::default());
-                    rules_dirty = true;
+                for i in to_remove {
+                    values.rules.remove(i);
+                }
+
+                let add_rule = ui.button("Add rule");
+
+                if add_rule.clicked() {
+                    values.rules.push(Default::default());
+                };
+
+                if rot_angle.changed()
+                    || segment_length.changed()
+                    || iterations.changed()
+                    || add_rule.clicked()
+                    || axiom.changed()
+                    || rule_changed
+                {
+                    events.send(GameEvent::TriggerUpdate(entity))
                 }
             });
-        if rules_dirty {
-            rules.dirty();
-        }
-        if render_dirty {
-            render.dirty();
-        }
     });
+}
+
+#[derive(Component)]
+pub struct OptionsComponent {
+    pub rotation_amount: f32,
+    pub segment_length: f32,
+    pub rules: Vec<String>,
+    pub axiom: String,
+    pub iterations: usize,
+}
+
+impl Default for OptionsComponent {
+    fn default() -> Self {
+        Self {
+            rotation_amount: 20f32,
+            segment_length: 0.1f32,
+            rules: vec![String::from("X=F[+F+X][-F-X]FX"), String::from("F=FFX")],
+            axiom: String::from("X"),
+            iterations: 5,
+        }
+    }
 }

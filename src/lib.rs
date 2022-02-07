@@ -6,6 +6,7 @@ use smooth_bevy_cameras::{
     LookTransformPlugin,
 };
 
+pub mod events;
 mod input;
 mod plant;
 #[cfg(target_arch = "wasm32")]
@@ -32,6 +33,7 @@ impl Plugin for GamePlugin {
                 override_input_system: true,
             })
             .add_system(input::input_map_system)
+            .add_system(events::process_events_system)
             .add_startup_system(setup);
 
         #[cfg(target_arch = "wasm32")]
