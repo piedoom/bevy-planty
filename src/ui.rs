@@ -12,21 +12,45 @@ impl Plugin for UiPlugin {
 
 fn ui_system(
     mut ctx: ResMut<bevy_egui::EguiContext>,
-    mut plants: Query<(Entity, &mut OptionsComponent), With<PlantComponent>>,
+    mut plants: Query<(Entity, &mut OptionsComponent, &PlantInfoComponent), With<PlantComponent>>,
     mut events: EventWriter<GameEvent>,
 ) {
+    // egui::TopBottomPanel::bottom("info").show(ctx.ctx_mut(), |ui| {
+
+    // });
+
     let mut i = 0;
-    plants.for_each_mut(|(entity, mut values)| {
+    plants.for_each_mut(|(entity, mut values, PlantInfoComponent { line_count })| {
         i += 1;
         egui::Window::new(format!("Plant {i} settings"))
             .collapsible(false)
             .default_pos(egui::Pos2::new(32., 32.))
             .resizable(false)
             .show(ctx.ctx_mut(), |ui| {
+                ui.label(format!("Total polylines: {line_count}"));
+
+                ui.separator();
+
+                ui.label("Draw method");
+                let render_checkbox = ui.checkbox(
+                    &mut values.expensive_rendering,
+                    "Use expensive rendering mode (may cause issues)",
+                );
+                ui.small("Disabling this enables more iterations");
+
+                ui.separator();
+
                 ui.style_mut().spacing.slider_width = 300.;
                 // Show render settings
                 ui.label("Iterations");
-                let iterations = ui.add(egui::Slider::new(&mut values.iterations, 1..=9));
+                let iter_range = {
+                    if values.expensive_rendering {
+                        1..=7
+                    } else {
+                        1..=10
+                    }
+                };
+                let iterations = ui.add(egui::Slider::new(&mut values.iterations, iter_range));
 
                 ui.separator();
 
@@ -42,7 +66,7 @@ fn ui_system(
                 ui.label("Segment length");
                 let segment_length = ui.add(egui::Slider::new(
                     &mut values.segment_length,
-                    0.01f32..=0.2f32,
+                    0.01f32..=1.0f32,
                 ));
 
                 ui.separator();
@@ -94,6 +118,7 @@ fn ui_system(
                     || iterations.changed()
                     || add_rule.clicked()
                     || axiom.changed()
+                    || render_checkbox.changed()
                     || rule_changed
                 {
                     events.send(GameEvent::TriggerUpdate(entity))
@@ -109,16 +134,18 @@ pub struct OptionsComponent {
     pub rules: Vec<String>,
     pub axiom: String,
     pub iterations: usize,
+    pub expensive_rendering: bool,
 }
 
 impl Default for OptionsComponent {
     fn default() -> Self {
         Self {
             rotation_amount: 20f32,
-            segment_length: 0.1f32,
-            rules: vec![String::from("X=F[+F+X][-F-X]FX"), String::from("F=FFX")],
+            segment_length: 0.5f32,
+            rules: vec![String::from("X=[+F][-F]FX"), String::from("F=FX")],
             axiom: String::from("X"),
             iterations: 5,
+            expensive_rendering: false,
         }
     }
 }

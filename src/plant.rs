@@ -32,6 +32,11 @@ impl PlantComponent {
 }
 
 #[derive(Component, Default)]
+pub struct PlantInfoComponent {
+    pub line_count: usize,
+}
+
+#[derive(Component, Default)]
 pub struct PlantRendererComponent {
     state: RenderState,
 }
@@ -74,9 +79,17 @@ impl PlantRendererComponent {
                     verts.push(pos);
                 }
                 Action::Rotate(r) => {
-                    let angle = options.rotation_amount.to_radians()
-                        * if r == &Direction::Left { -1f32 } else { 1f32 };
-                    rot *= Quat::from_euler(EulerRot::XYZ, angle * 2f32, angle, 0f32);
+                    let angle = options.rotation_amount.to_radians();
+                    let params = match r {
+                        Direction::XPos => (angle, 0f32, 0f32),
+                        Direction::XNeg => (-angle, 0f32, 0f32),
+                        Direction::YPos => (0f32, angle, 0f32),
+                        Direction::YNeg => (0f32, -angle, 0f32),
+                        Direction::ZPos => (0f32, 0f32, angle),
+                        Direction::ZNeg => (0f32, 0f32, -angle),
+                    };
+
+                    rot *= Quat::from_euler(EulerRot::XYZ, params.0, params.1, params.2);
                 }
                 Action::Push => {
                     self.state.push(pos, rot);
@@ -85,13 +98,18 @@ impl PlantRendererComponent {
                     if let Some((new_pos, new_rot)) = self.state.pop() {
                         pos = new_pos;
                         rot = new_rot;
+
+                        // additionally, push the verts to our line. this is due to how polyline works
+                        // HOWEVER these individual lines also are very expensive. We can disable this in our UI
+                        if options.expensive_rendering {
+                            lines.push(verts.drain(0..).collect());
+                        }
+                        verts.push(pos);
                     }
-                    // additionally, push the verts to our line. this is due to how polyline works
-                    lines.push(verts.drain(0..).collect());
-                    verts.push(pos);
                 }
             }
         }
+        lines.push(verts.drain(0..).collect());
         lines
     }
 }
@@ -102,6 +120,7 @@ fn solver_system(
         (
             Entity,
             &mut PlantComponent,
+            &mut PlantInfoComponent,
             &mut PlantRendererComponent,
             &OptionsComponent,
         ),
@@ -110,13 +129,14 @@ fn solver_system(
     mut polylines: ResMut<Assets<Polyline>>,
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
 ) {
-    plants.for_each_mut(|(e, mut plant, mut render, options)| {
+    plants.for_each_mut(|(e, mut plant, mut info, mut render, options)| {
         cmd.entity(e).despawn_descendants();
 
         plant.structure.step_by(options.iterations);
         let instructions = plant.render_actions();
         // build lines
         let mut lines: Vec<Vec<Vec3>> = render.generate_lines(&instructions, options);
+        info.line_count = lines.len();
 
         cmd.entity(e).with_children(|c| {
             let lines_len = lines.len();
@@ -152,8 +172,12 @@ pub enum Action {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
-    Right,
-    Left,
+    XPos,
+    XNeg,
+    YPos,
+    YNeg,
+    ZPos,
+    ZNeg,
 }
 
 fn setup_system(mut cmd: Commands, mut events: EventWriter<GameEvent>) {
@@ -162,8 +186,12 @@ fn setup_system(mut cmd: Commands, mut events: EventWriter<GameEvent>) {
         .set_tokens(&[
             ('X', Action::Nothing),
             ('F', Action::Forwards),
-            ('+', Action::Rotate(Direction::Right)),
-            ('-', Action::Rotate(Direction::Left)),
+            ('+', Action::Rotate(Direction::XPos)),
+            ('-', Action::Rotate(Direction::XNeg)),
+            ('>', Action::Rotate(Direction::YPos)),
+            ('<', Action::Rotate(Direction::YNeg)),
+            ('^', Action::Rotate(Direction::ZPos)),
+            ('v', Action::Rotate(Direction::ZNeg)),
             ('[', Action::Push),
             (']', Action::Pop),
         ])
@@ -177,6 +205,7 @@ fn setup_system(mut cmd: Commands, mut events: EventWriter<GameEvent>) {
         .insert(builder)
         .insert(OptionsComponent::default())
         .insert(PlantRendererComponent::default())
+        .insert(PlantInfoComponent::default())
         .id();
     events.send(GameEvent::TriggerUpdate(entity));
 }
