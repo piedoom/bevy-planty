@@ -40,8 +40,7 @@ version = "*"
 [patch]
 [patch.crates-io]
 [patch.crates-io.bevy]
-#branch = "main"
-rev = "b13f238fc73692741ff87f804117770b1f42933c"
+branch = "main"
 git = "https://github.com/bevyengine/bevy"
 
 [target]
