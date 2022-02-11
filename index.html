@@ -21,8 +21,8 @@
     </style>
     <script>
         (function () {
-            window.addEventListener("contextmenu", (e) => { e.preventDefault(); return false; });
-            window.addEventListener("mousedown", (e) => { if (e.button == 1) { e.preventDefault(); return false; } });
+            window.addEventListener("contextmenu", (e) => { e.preventDefault(); });
+            window.addEventListener("mousedown", (e) => { if (e.button == 1) { e.preventDefault(); } });
         })();
     </script>
 </head>

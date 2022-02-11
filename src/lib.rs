@@ -54,7 +54,10 @@ fn setup(mut commands: Commands) {
     });
     // camera
     commands.spawn_bundle(OrbitCameraBundle::new(
-        OrbitCameraController::default(),
+        OrbitCameraController {
+            mouse_translate_sensitivity: Vec2::splat(0.016),
+            ..OrbitCameraController::default()
+        },
         PerspectiveCameraBundle {
             transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()

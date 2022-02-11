@@ -174,6 +174,32 @@ pub enum Action {
     Pop,
 }
 
+impl std::fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Action::Nothing => {
+                    "Do nothing".to_string()
+                }
+                Action::Forwards => {
+                    "Move forwards".to_string()
+                }
+                Action::Rotate(direction) => {
+                    format!("Rotate {direction}")
+                }
+                Action::Push => {
+                    "Push transform".to_string()
+                }
+                Action::Pop => {
+                    "Pop transform".to_string()
+                }
+            }
+        )
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
     XPos,
@@ -182,6 +208,23 @@ pub enum Direction {
     YNeg,
     ZPos,
     ZNeg,
+}
+
+impl std::fmt::Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::XPos => "right",
+                Self::XNeg => "left",
+                Self::YPos => "forwards",
+                Self::YNeg => "back",
+                Self::ZPos => "up",
+                Self::ZNeg => "down",
+            }
+        )
+    }
 }
 
 fn setup_system(mut cmd: Commands, mut events: EventWriter<GameEvent>) {
