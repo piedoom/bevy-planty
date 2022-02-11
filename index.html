@@ -19,6 +19,12 @@
             height: 100vh;
         }
     </style>
+    <script>
+        (function () {
+            window.addEventListener("contextmenu", (e) => { e.preventDefault(); return false; });
+            window.addEventListener("mousedown", (e) => { if (e.button == 1) { e.preventDefault(); return false; } });
+        })();
+    </script>
 </head>
 
 

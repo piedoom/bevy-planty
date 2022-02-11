@@ -103,6 +103,10 @@ impl PlantRendererComponent {
                         // HOWEVER these individual lines also are very expensive. We can disable this in our UI
                         if options.expensive_rendering {
                             lines.push(verts.drain(0..).collect());
+                        } else {
+                            // Thanks to @aevyrie as usual:
+                            // https://github.com/ForesightMiningSoftwareCorporation/bevy_polyline/issues/20#issuecomment-1035624250
+                            verts.push(Vec3::splat(f32::NEG_INFINITY));
                         }
                         verts.push(pos);
                     }
