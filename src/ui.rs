@@ -20,7 +20,6 @@ fn ui_system(
         &mut OptionsComponent,
         &PlantStatsComponent,
         &PlantComponent,
-        &PlantBuilderComponent,
         &mut Transform,
     )>,
     mut events: EventWriter<GameEvent>,
@@ -56,14 +55,7 @@ fn ui_system(
 
     let mut i = 0;
     plants.for_each_mut(
-        |(
-            entity,
-            mut values,
-            PlantStatsComponent { vert_count },
-            plant,
-            builder,
-            mut transform,
-        )| {
+        |(entity, mut values, PlantStatsComponent { vert_count }, plant, mut transform)| {
             i += 1;
             let is_selected = selected.0.iter().any(|(x, _)| *x == entity);
             let mut window_is_open = is_selected;
@@ -219,55 +211,56 @@ fn ui_system(
 
                                 let mut current_action =
                                     plant.action_map.get(&token).unwrap().clone();
-                                let combo = egui::ComboBox::from_id_source(format!(
-                                    "{:?}{}",
-                                    entity, token
-                                ))
-                                .selected_text(current_action.to_string())
-                                .show_ui(ui, |ui| {
-                                    let mut select = |current: &mut Action, action: Action| {
-                                        if ui
-                                            .selectable_value(current, action, action.to_string())
-                                            .clicked()
-                                        {
-                                            events.send(GameEvent::ChangeAction {
-                                                entity,
-                                                token: **token,
-                                                action: action,
-                                            })
-                                        }
-                                    };
+                                egui::ComboBox::from_id_source(format!("{:?}{}", entity, token))
+                                    .selected_text(current_action.to_string())
+                                    .show_ui(ui, |ui| {
+                                        let mut select = |current: &mut Action, action: Action| {
+                                            if ui
+                                                .selectable_value(
+                                                    current,
+                                                    action,
+                                                    action.to_string(),
+                                                )
+                                                .clicked()
+                                            {
+                                                events.send(GameEvent::ChangeAction {
+                                                    entity,
+                                                    token: **token,
+                                                    action: action,
+                                                })
+                                            }
+                                        };
 
-                                    select(&mut current_action, Action::Nothing);
-                                    select(&mut current_action, Action::Forwards);
-                                    select(
-                                        &mut current_action,
-                                        Action::Rotate(plant::Direction::XPos),
-                                    );
-                                    select(
-                                        &mut current_action,
-                                        Action::Rotate(plant::Direction::XNeg),
-                                    );
-                                    select(
-                                        &mut current_action,
-                                        Action::Rotate(plant::Direction::YPos),
-                                    );
-                                    select(
-                                        &mut current_action,
-                                        Action::Rotate(plant::Direction::YNeg),
-                                    );
-                                    select(
-                                        &mut current_action,
-                                        Action::Rotate(plant::Direction::ZPos),
-                                    );
-                                    select(
-                                        &mut current_action,
-                                        Action::Rotate(plant::Direction::ZNeg),
-                                    );
-                                    select(&mut current_action, Action::Push);
-                                    select(&mut current_action, Action::Pop);
-                                })
-                                .response;
+                                        select(&mut current_action, Action::Nothing);
+                                        select(&mut current_action, Action::Forwards);
+                                        select(
+                                            &mut current_action,
+                                            Action::Rotate(plant::Direction::XPos),
+                                        );
+                                        select(
+                                            &mut current_action,
+                                            Action::Rotate(plant::Direction::XNeg),
+                                        );
+                                        select(
+                                            &mut current_action,
+                                            Action::Rotate(plant::Direction::YPos),
+                                        );
+                                        select(
+                                            &mut current_action,
+                                            Action::Rotate(plant::Direction::YNeg),
+                                        );
+                                        select(
+                                            &mut current_action,
+                                            Action::Rotate(plant::Direction::ZPos),
+                                        );
+                                        select(
+                                            &mut current_action,
+                                            Action::Rotate(plant::Direction::ZNeg),
+                                        );
+                                        select(&mut current_action, Action::Push);
+                                        select(&mut current_action, Action::Pop);
+                                    })
+                                    .response;
 
                                 if ui.button("Remove").clicked() {
                                     events.send(GameEvent::RemoveToken {
@@ -281,7 +274,7 @@ fn ui_system(
                         if ui.button("Add symbol").clicked() {
                             events.send(GameEvent::AddToken {
                                 entity,
-                                token: '.',
+                                token: '~',
                                 action: Action::Nothing,
                             });
                         }

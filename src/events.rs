@@ -91,14 +91,14 @@ pub(crate) fn process_events_system(
                 selected.0.insert(entity, ());
             }
             GameEvent::RemoveToken { token, entity } => {
-                if let Ok((options, mut builder, mut plant)) = plants.get_mut(entity) {
+                if let Ok((_, mut builder, _)) = plants.get_mut(entity) {
                     builder.remove_token(token);
                     events_buf.push(GameEvent::TriggerUpdate(entity));
                 }
             }
             GameEvent::ChangeToken { entity, prev, next } => {
-                if let Ok((options, mut builder, mut plant)) = plants.get_mut(entity) {
-                    if let Some((arena_id, action)) = builder.remove_token(prev) {
+                if let Ok((_, mut builder, _)) = plants.get_mut(entity) {
+                    if let Some((_, action)) = builder.remove_token(prev) {
                         builder.add_token(next, action);
                         events_buf.push(GameEvent::TriggerUpdate(entity));
                     }
@@ -109,7 +109,7 @@ pub(crate) fn process_events_system(
                 token,
                 action,
             } => {
-                if let Ok((options, mut builder, mut plant)) = plants.get_mut(entity) {
+                if let Ok((_, mut builder, _)) = plants.get_mut(entity) {
                     if let Some((_, _)) = builder.remove_token(token) {
                         builder.add_token(token, action);
                         events_buf.push(GameEvent::TriggerUpdate(entity));

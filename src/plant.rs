@@ -308,13 +308,6 @@ impl PlantBuilderComponent {
             .ok_or_else(|| anyhow::anyhow!("Could not get token with name {token}"))?)
     }
 
-    pub fn get_token_mut(&mut self, token: char) -> anyhow::Result<(ArenaId, Action)> {
-        Ok(*self
-            .tokens
-            .get_mut(&token)
-            .ok_or_else(|| anyhow::anyhow!("Could not get token with name {token}"))?)
-    }
-
     pub fn generate(&self) -> PlantComponent {
         let f = self.builder.clone();
         PlantComponent {
