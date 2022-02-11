@@ -15,29 +15,51 @@ fn ui_system(
     mut plants: Query<(
         Entity,
         &mut OptionsComponent,
-        &PlantInfoComponent,
+        &PlantStatsComponent,
         &PlantComponent,
+        &mut Transform,
     )>,
     mut events: EventWriter<GameEvent>,
+    mut selected: ResMut<SelectedPlantsResource>,
+    mut offset: Local<Vec3>,
 ) {
     egui::TopBottomPanel::bottom("info").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
-            ui.label("Rotate: Middle click and drag");
+            if ui.button("Add plant").clicked() {
+                *offset = *offset + Vec3::X * 2f32;
+                events.send(GameEvent::SpawnNew(Transform::from_translation(*offset)));
+            }
+
             ui.separator();
-            ui.label("Pan: Right click and drag");
-            ui.separator();
-            ui.label("Zoom: Scroll in and out");
+
+            plants.for_each(|(e, ..)| {
+                if ui.button(format!("Plant {}", e.id() - 1)).clicked() {
+                    selected.0.insert(e, ());
+                }
+            });
+        });
+        ui.separator();
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Rotate: Middle click and drag");
+                ui.separator();
+                ui.label("Pan: Right click and drag");
+                ui.separator();
+                ui.label("Zoom: Scroll in and out");
+            });
         });
     });
 
     let mut i = 0;
     plants.for_each_mut(
-        |(entity, mut values, PlantInfoComponent { vert_count }, plant)| {
+        |(entity, mut values, PlantStatsComponent { vert_count }, plant, mut transform)| {
             i += 1;
+            let is_selected = selected.0.iter().any(|(x, _)| *x == entity);
+            let mut window_is_open = is_selected;
             egui::Window::new(format!("Plant {i} settings"))
                 .collapsible(false)
-                .default_pos(egui::Pos2::new(32., 32.))
                 .resizable(false)
+                .open(&mut window_is_open)
                 .show(ctx.ctx_mut(), |ui| {
                     ui.label(format!("Total verticies: {vert_count}"));
 
@@ -49,10 +71,33 @@ fn ui_system(
 
                         ui.label("Line width");
                         let width = ui.add(
-                            egui::Slider::new(&mut values.line_width, 1f32..=500f32)
+                            egui::Slider::new(&mut values.line_width, 0.1f32..=500f32)
                                 .smart_aim(false)
                                 .max_decimals(2),
                         );
+
+                        ui.separator();
+
+                        ui.label("Transform");
+                        let mut translation: Vec3 = transform.translation.clone();
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                egui::DragValue::new(&mut translation.x)
+                                    .prefix("x: ")
+                                    .min_decimals(2),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut translation.y)
+                                    .prefix("y: ")
+                                    .min_decimals(2),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut translation.z)
+                                    .prefix("z: ")
+                                    .min_decimals(2),
+                            );
+                        });
+                        transform.translation = translation;
 
                         ui.separator();
 
@@ -87,25 +132,6 @@ fn ui_system(
                         {
                             events.send(GameEvent::TriggerUpdate(entity))
                         }
-                    });
-
-                    ui.separator();
-
-                    ui.collapsing("Symbols reference", |ui| {
-                        ui.vertical(|ui| {
-                            let mut chars: Vec<&char> =
-                                plant.action_map.iter().map(|(c, _)| c).collect();
-                            chars.sort();
-
-                            for c in chars {
-                                ui.monospace(format!(
-                                    "{}: {}",
-                                    c.to_string(),
-                                    plant.action_map.get(&c).unwrap()
-                                ));
-                                ui.separator();
-                            }
-                        });
                     });
 
                     ui.separator();
@@ -159,7 +185,31 @@ fn ui_system(
                                 events.send(GameEvent::TriggerUpdate(entity))
                             }
                         });
+
+                    ui.separator();
+
+                    ui.collapsing("Symbols reference", |ui| {
+                        ui.vertical(|ui| {
+                            let mut chars: Vec<&char> =
+                                plant.action_map.iter().map(|(c, _)| c).collect();
+                            chars.sort();
+
+                            for c in chars {
+                                ui.monospace(format!(
+                                    "{}: {}",
+                                    c.to_string(),
+                                    plant.action_map.get(&c).unwrap()
+                                ));
+                                ui.separator();
+                            }
+                        });
+                    });
                 });
+
+            // if the window has closed this frame
+            if window_is_open == false && is_selected {
+                selected.0.remove(&entity);
+            }
         },
     );
 }

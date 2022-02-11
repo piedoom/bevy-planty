@@ -10,7 +10,7 @@ pub struct PlantPlugin;
 impl Plugin for PlantPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<GameEvent>()
-            .add_startup_system(setup_system)
+            .init_resource::<SelectedPlantsResource>()
             .add_system(solver_system);
     }
 }
@@ -32,7 +32,10 @@ impl PlantComponent {
 }
 
 #[derive(Component, Default)]
-pub struct PlantInfoComponent {
+pub struct SelectedPlantsResource(pub HashMap<Entity, ()>);
+
+#[derive(Component, Default)]
+pub struct PlantStatsComponent {
     pub vert_count: usize,
 }
 
@@ -112,32 +115,38 @@ fn solver_system(
         (
             Entity,
             &mut PlantComponent,
-            &mut PlantInfoComponent,
+            &mut PlantStatsComponent,
             &mut PlantRendererComponent,
             &OptionsComponent,
+            &Transform,
+            &GlobalTransform,
         ),
         Changed<PlantComponent>,
     >,
     mut polylines: ResMut<Assets<Polyline>>,
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
 ) {
-    plants.for_each_mut(|(e, mut plant, mut info, mut render, options)| {
-        plant.structure.step_by(options.iterations);
-        let instructions = plant.render_actions();
+    plants.for_each_mut(
+        |(e, mut plant, mut info, mut render, options, transform, global_transform)| {
+            plant.structure.step_by(options.iterations);
+            let instructions = plant.render_actions();
 
-        let vertices: Vec<Vec3> = render.generate_verts(&instructions, options);
-        info.vert_count = vertices.len();
+            let vertices: Vec<Vec3> = render.generate_verts(&instructions, options);
+            info.vert_count = vertices.len();
 
-        cmd.entity(e).insert_bundle(PolylineBundle {
-            polyline: polylines.add(Polyline { vertices }),
-            material: polyline_materials.add(PolylineMaterial {
-                width: options.line_width,
-                color: Color::from(options.line_color.to_rgba_premultiplied()),
-                perspective: true,
-            }),
-            ..Default::default()
-        });
-    });
+            cmd.entity(e).insert_bundle(PolylineBundle {
+                polyline: polylines.add(Polyline { vertices }),
+                material: polyline_materials.add(PolylineMaterial {
+                    width: options.line_width,
+                    color: Color::from(options.line_color.to_rgba_premultiplied()),
+                    perspective: true,
+                }),
+                transform: *transform,
+                global_transform: *global_transform,
+                ..Default::default()
+            });
+        },
+    );
 }
 
 #[derive(Clone, Copy)]
@@ -202,34 +211,15 @@ impl std::fmt::Display for Direction {
     }
 }
 
-fn setup_system(mut cmd: Commands, mut events: EventWriter<GameEvent>) {
-    let mut builder = PlantBuilderComponent::default();
-    builder
-        .set_tokens(&[
-            ('X', Action::Nothing),
-            ('F', Action::Forwards),
-            ('+', Action::Rotate(Direction::XPos)),
-            ('-', Action::Rotate(Direction::XNeg)),
-            ('>', Action::Rotate(Direction::YPos)),
-            ('<', Action::Rotate(Direction::YNeg)),
-            ('^', Action::Rotate(Direction::ZPos)),
-            ('v', Action::Rotate(Direction::ZNeg)),
-            ('[', Action::Push),
-            (']', Action::Pop),
-        ])
-        .set_axiom("X")
-        .ok();
-
-    let plant = builder.generate();
-    let entity = cmd
-        .spawn()
-        .insert(plant)
-        .insert(builder)
-        .insert(OptionsComponent::default())
-        .insert(PlantRendererComponent::default())
-        .insert(PlantInfoComponent::default())
-        .id();
-    events.send(GameEvent::TriggerUpdate(entity));
+#[derive(Bundle)]
+pub struct PlantBundle {
+    pub plant: PlantComponent,
+    pub builder: PlantBuilderComponent,
+    pub options: OptionsComponent,
+    pub renderer: PlantRendererComponent,
+    pub stats: PlantStatsComponent,
+    pub transform: Transform,
+    pub global_transform: GlobalTransform,
 }
 
 #[derive(Component, Default)]

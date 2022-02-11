@@ -1,6 +1,7 @@
 use bevy::{core_pipeline::ClearColor, prelude::*, DefaultPlugins};
 use bevy_egui::EguiPlugin;
 use bevy_polyline::PolylinePlugin;
+use events::GameEvent;
 use smooth_bevy_cameras::{
     controllers::orbit::{OrbitCameraBundle, OrbitCameraController, OrbitCameraPlugin},
     LookTransformPlugin,
@@ -42,7 +43,7 @@ impl Plugin for GamePlugin {
 }
 
 /// set up a simple 3D scene
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, mut events: EventWriter<GameEvent>) {
     commands.spawn_bundle(PointLightBundle {
         point_light: PointLight {
             intensity: 1500.0,
@@ -65,4 +66,5 @@ fn setup(mut commands: Commands) {
         Vec3::new(-10.0, 5.0, -10.0),
         Vec3::new(0., 5., 0.),
     ));
+    events.send(GameEvent::SpawnNew(Default::default()));
 }
