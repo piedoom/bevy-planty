@@ -435,9 +435,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_polyline"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0973d599ae862049333b74cb5216de1be07cf7db675b6dcc0e055006ab41be26"
+version = "0.1.1"
+source = "git+https://github.com/ForesightMiningSoftwareCorporation/bevy_polyline#b9d35cb509ea8f5297b3f217f9caff210dc09226"
 dependencies = [
  "bevy",
  "bitflags",

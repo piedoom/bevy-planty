@@ -7,7 +7,7 @@ edition = "2021"
 name = "pl"
 
 [dependencies]
-bevy_polyline = "0.1"
+bevy_polyline = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_polyline" }
 lazy_static = "1.4"
 regex = "1.5"
 anyhow = "1"
@@ -41,6 +41,7 @@ version = "*"
 [patch.crates-io]
 [patch.crates-io.bevy]
 branch = "main"
+#rev = "b13f238fc73692741ff87f804117770b1f42933c"
 git = "https://github.com/bevyengine/bevy"
 
 [target]
