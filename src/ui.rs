@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 use bevy_egui::egui::{self, color::Hsva};
 
-use crate::{events::GameEvent, plant::*};
+use crate::{
+    events::GameEvent,
+    plant::{self, *},
+};
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
@@ -17,6 +20,7 @@ fn ui_system(
         &mut OptionsComponent,
         &PlantStatsComponent,
         &PlantComponent,
+        &PlantBuilderComponent,
         &mut Transform,
     )>,
     mut events: EventWriter<GameEvent>,
@@ -52,7 +56,14 @@ fn ui_system(
 
     let mut i = 0;
     plants.for_each_mut(
-        |(entity, mut values, PlantStatsComponent { vert_count }, plant, mut transform)| {
+        |(
+            entity,
+            mut values,
+            PlantStatsComponent { vert_count },
+            plant,
+            builder,
+            mut transform,
+        )| {
             i += 1;
             let is_selected = selected.0.iter().any(|(x, _)| *x == entity);
             let mut window_is_open = is_selected;
@@ -188,21 +199,92 @@ fn ui_system(
 
                     ui.separator();
 
-                    ui.collapsing("Symbols reference", |ui| {
-                        ui.vertical(|ui| {
-                            let mut chars: Vec<&char> =
-                                plant.action_map.iter().map(|(c, _)| c).collect();
-                            chars.sort();
+                    ui.collapsing("Symbols", |ui| {
+                        let mut chars: Vec<&char> =
+                            plant.action_map.iter().map(|(c, _)| c).collect();
+                        chars.sort();
+                        egui::Grid::new(format!("grid {:?}", entity)).show(ui, |ui| {
+                            for token in chars.iter() {
+                                let mut token_text = token.to_string();
+                                let token_edit = ui.text_edit_singleline(&mut token_text);
 
-                            for c in chars {
-                                ui.monospace(format!(
-                                    "{}: {}",
-                                    c.to_string(),
-                                    plant.action_map.get(&c).unwrap()
-                                ));
-                                ui.separator();
+                                if token_edit.changed() && !token_text.is_empty() {
+                                    let next = token_text.chars().next().unwrap_or(**token);
+                                    events.send(GameEvent::ChangeToken {
+                                        entity,
+                                        prev: **token,
+                                        next,
+                                    });
+                                }
+
+                                let mut current_action =
+                                    plant.action_map.get(&token).unwrap().clone();
+                                let combo = egui::ComboBox::from_id_source(format!(
+                                    "{:?}{}",
+                                    entity, token
+                                ))
+                                .selected_text(current_action.to_string())
+                                .show_ui(ui, |ui| {
+                                    let mut select = |current: &mut Action, action: Action| {
+                                        if ui
+                                            .selectable_value(current, action, action.to_string())
+                                            .clicked()
+                                        {
+                                            events.send(GameEvent::ChangeAction {
+                                                entity,
+                                                token: **token,
+                                                action: action,
+                                            })
+                                        }
+                                    };
+
+                                    select(&mut current_action, Action::Nothing);
+                                    select(&mut current_action, Action::Forwards);
+                                    select(
+                                        &mut current_action,
+                                        Action::Rotate(plant::Direction::XPos),
+                                    );
+                                    select(
+                                        &mut current_action,
+                                        Action::Rotate(plant::Direction::XNeg),
+                                    );
+                                    select(
+                                        &mut current_action,
+                                        Action::Rotate(plant::Direction::YPos),
+                                    );
+                                    select(
+                                        &mut current_action,
+                                        Action::Rotate(plant::Direction::YNeg),
+                                    );
+                                    select(
+                                        &mut current_action,
+                                        Action::Rotate(plant::Direction::ZPos),
+                                    );
+                                    select(
+                                        &mut current_action,
+                                        Action::Rotate(plant::Direction::ZNeg),
+                                    );
+                                    select(&mut current_action, Action::Push);
+                                    select(&mut current_action, Action::Pop);
+                                })
+                                .response;
+
+                                if ui.button("Remove").clicked() {
+                                    events.send(GameEvent::RemoveToken {
+                                        entity,
+                                        token: **token,
+                                    });
+                                }
+                                ui.end_row();
                             }
                         });
+                        if ui.button("Add symbol").clicked() {
+                            events.send(GameEvent::AddToken {
+                                entity,
+                                token: '.',
+                                action: Action::Nothing,
+                            });
+                        }
                     });
                 });
 

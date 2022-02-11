@@ -149,7 +149,7 @@ fn solver_system(
     );
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Action {
     Nothing,
     Forwards,
@@ -278,6 +278,10 @@ impl PlantBuilderComponent {
         self
     }
 
+    pub fn remove_token(&mut self, token: char) -> Option<(ArenaId, Action)> {
+        self.tokens.remove(&token)
+    }
+
     pub fn set_tokens(&mut self, tokens: &[(char, Action)]) -> &mut Self {
         self.builder = Default::default();
         self.tokens = Default::default();
@@ -301,6 +305,13 @@ impl PlantBuilderComponent {
         Ok(*self
             .tokens
             .get(&token)
+            .ok_or_else(|| anyhow::anyhow!("Could not get token with name {token}"))?)
+    }
+
+    pub fn get_token_mut(&mut self, token: char) -> anyhow::Result<(ArenaId, Action)> {
+        Ok(*self
+            .tokens
+            .get_mut(&token)
             .ok_or_else(|| anyhow::anyhow!("Could not get token with name {token}"))?)
     }
 

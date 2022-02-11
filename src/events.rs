@@ -11,6 +11,25 @@ use crate::{
 pub enum GameEvent {
     TriggerUpdate(Entity),
     SpawnNew(Transform),
+    RemoveToken {
+        entity: Entity,
+        token: char,
+    },
+    ChangeToken {
+        entity: Entity,
+        prev: char,
+        next: char,
+    },
+    ChangeAction {
+        entity: Entity,
+        token: char,
+        action: Action,
+    },
+    AddToken {
+        entity: Entity,
+        token: char,
+        action: Action,
+    },
 }
 
 pub(crate) fn process_events_system(
@@ -70,6 +89,42 @@ pub(crate) fn process_events_system(
                     .id();
                 events_buf.push(GameEvent::TriggerUpdate(entity));
                 selected.0.insert(entity, ());
+            }
+            GameEvent::RemoveToken { token, entity } => {
+                if let Ok((options, mut builder, mut plant)) = plants.get_mut(entity) {
+                    builder.remove_token(token);
+                    events_buf.push(GameEvent::TriggerUpdate(entity));
+                }
+            }
+            GameEvent::ChangeToken { entity, prev, next } => {
+                if let Ok((options, mut builder, mut plant)) = plants.get_mut(entity) {
+                    if let Some((arena_id, action)) = builder.remove_token(prev) {
+                        builder.add_token(next, action);
+                        events_buf.push(GameEvent::TriggerUpdate(entity));
+                    }
+                }
+            }
+            GameEvent::ChangeAction {
+                entity,
+                token,
+                action,
+            } => {
+                if let Ok((options, mut builder, mut plant)) = plants.get_mut(entity) {
+                    if let Some((_, _)) = builder.remove_token(token) {
+                        builder.add_token(token, action);
+                        events_buf.push(GameEvent::TriggerUpdate(entity));
+                    }
+                }
+            }
+            GameEvent::AddToken {
+                entity,
+                token,
+                action,
+            } => {
+                if let Ok((_, mut builder, ..)) = plants.get_mut(entity) {
+                    builder.add_token(token, action);
+                    events_buf.push(GameEvent::TriggerUpdate(entity));
+                }
             }
         }
     }
