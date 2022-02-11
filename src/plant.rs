@@ -33,7 +33,7 @@ impl PlantComponent {
 
 #[derive(Component, Default)]
 pub struct PlantInfoComponent {
-    pub line_count: usize,
+    pub vert_count: usize,
 }
 
 #[derive(Component, Default)]
@@ -59,14 +59,9 @@ impl RenderState {
 }
 
 impl PlantRendererComponent {
-    pub fn generate_lines(
-        &mut self,
-        actions: &[Action],
-        options: &OptionsComponent,
-    ) -> Vec<Vec<Vec3>> {
+    pub fn generate_verts(&mut self, actions: &[Action], options: &OptionsComponent) -> Vec<Vec3> {
         let (mut pos, mut rot) = self.state.cursor;
 
-        let mut lines = vec![];
         let mut verts = vec![];
 
         for action in actions {
@@ -98,23 +93,16 @@ impl PlantRendererComponent {
                     if let Some((new_pos, new_rot)) = self.state.pop() {
                         pos = new_pos;
                         rot = new_rot;
-
-                        // additionally, push the verts to our line. this is due to how polyline works
-                        // HOWEVER these individual lines also are very expensive. We can disable this in our UI
-                        if options.expensive_rendering {
-                            lines.push(verts.drain(0..).collect());
-                        } else {
-                            // Thanks to @aevyrie as usual:
-                            // https://github.com/ForesightMiningSoftwareCorporation/bevy_polyline/issues/20#issuecomment-1035624250
-                            verts.push(Vec3::splat(f32::NEG_INFINITY));
-                        }
+                        // Thanks to @aevyrie as usual:
+                        // https://github.com/ForesightMiningSoftwareCorporation/bevy_polyline/issues/20#issuecomment-1035624250
+                        // Use this to break lines
+                        verts.push(Vec3::splat(f32::NEG_INFINITY));
                         verts.push(pos);
                     }
                 }
             }
         }
-        lines.push(verts.drain(0..).collect());
-        lines
+        verts
     }
 }
 
@@ -134,35 +122,22 @@ fn solver_system(
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
 ) {
     plants.for_each_mut(|(e, mut plant, mut info, mut render, options)| {
-        cmd.entity(e).despawn_descendants();
-
         plant.structure.step_by(options.iterations);
         let instructions = plant.render_actions();
-        // build lines
-        let mut lines: Vec<Vec<Vec3>> = render.generate_lines(&instructions, options);
-        info.line_count = lines.len();
 
-        cmd.entity(e).with_children(|c| {
-            let lines_len = lines.len();
-            for (i, line) in lines.drain(0..).enumerate() {
-                let normalized = i as f32 / lines_len as f32;
-                c.spawn_bundle(PolylineBundle {
-                    polyline: polylines.add(Polyline { vertices: line }),
-                    material: polyline_materials.add(PolylineMaterial {
-                        width: 20.0 - (normalized * 10.0),
-                        color: get_color(normalized),
-                        perspective: true,
-                    }),
-                    ..Default::default()
-                });
-            }
+        let vertices: Vec<Vec3> = render.generate_verts(&instructions, options);
+        info.vert_count = vertices.len();
+
+        cmd.entity(e).insert_bundle(PolylineBundle {
+            polyline: polylines.add(Polyline { vertices }),
+            material: polyline_materials.add(PolylineMaterial {
+                width: options.line_width,
+                color: Color::from(options.line_color.to_rgba_premultiplied()),
+                perspective: true,
+            }),
+            ..Default::default()
         });
     });
-}
-
-#[inline(always)]
-fn get_color(percent: f32) -> Color {
-    Color::rgb(0., 1.0 - (percent * 0.3), 0.1 + (percent * 0.2))
 }
 
 #[derive(Clone, Copy)]

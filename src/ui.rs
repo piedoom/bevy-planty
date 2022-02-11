@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_egui::egui;
+use bevy_egui::egui::{self, color::Hsva};
 
 use crate::{events::GameEvent, plant::*};
 pub struct UiPlugin;
@@ -22,47 +22,45 @@ fn ui_system(
 ) {
     egui::TopBottomPanel::bottom("info").show(ctx.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
-            ui.small("Rotate: Middle click and drag");
+            ui.label("Rotate: Middle click and drag");
             ui.separator();
-            ui.small("Pan: Right click and drag");
+            ui.label("Pan: Right click and drag");
             ui.separator();
-            ui.small("Zoom: Scroll in and out");
+            ui.label("Zoom: Scroll in and out");
         });
     });
 
     let mut i = 0;
     plants.for_each_mut(
-        |(entity, mut values, PlantInfoComponent { line_count }, plant)| {
+        |(entity, mut values, PlantInfoComponent { vert_count }, plant)| {
             i += 1;
             egui::Window::new(format!("Plant {i} settings"))
                 .collapsible(false)
                 .default_pos(egui::Pos2::new(32., 32.))
                 .resizable(false)
                 .show(ctx.ctx_mut(), |ui| {
-                    ui.label(format!("Total polylines: {line_count}"));
+                    ui.label(format!("Total verticies: {vert_count}"));
 
                     ui.collapsing("Settings", |ui| {
-                        ui.label("Draw method");
-                        let render_checkbox = ui.checkbox(
-                            &mut values.expensive_rendering,
-                            "Use expensive rendering mode (may cause issues)",
+                        ui.label("Line color");
+                        let color = ui.color_edit_button_hsva(&mut values.line_color);
+
+                        ui.separator();
+
+                        ui.label("Line width");
+                        let width = ui.add(
+                            egui::Slider::new(&mut values.line_width, 1f32..=500f32)
+                                .smart_aim(false)
+                                .max_decimals(2),
                         );
-                        ui.small("Disabling this enables more iterations");
 
                         ui.separator();
 
                         ui.style_mut().spacing.slider_width = 300.;
                         // Show render settings
                         ui.label("Iterations");
-                        let iter_range = {
-                            if values.expensive_rendering {
-                                1..=7
-                            } else {
-                                1..=10
-                            }
-                        };
-                        let iterations =
-                            ui.add(egui::Slider::new(&mut values.iterations, iter_range));
+
+                        let iterations = ui.add(egui::Slider::new(&mut values.iterations, 1..=10));
 
                         ui.separator();
 
@@ -84,7 +82,8 @@ fn ui_system(
                         if rot_angle.changed()
                             || segment_length.changed()
                             || iterations.changed()
-                            || render_checkbox.changed()
+                            || color.changed()
+                            || width.changed()
                         {
                             events.send(GameEvent::TriggerUpdate(entity))
                         }
@@ -172,7 +171,8 @@ pub struct OptionsComponent {
     pub rules: Vec<String>,
     pub axiom: String,
     pub iterations: usize,
-    pub expensive_rendering: bool,
+    pub line_width: f32,
+    pub line_color: Hsva,
 }
 
 impl Default for OptionsComponent {
@@ -183,7 +183,8 @@ impl Default for OptionsComponent {
             rules: vec![String::from("X=[+F][^F][-F][vF]FX"), String::from("F=FX")],
             axiom: String::from("X"),
             iterations: 6,
-            expensive_rendering: false,
+            line_width: 10f32,
+            line_color: Hsva::from_rgb([0f32, 1f32, 0.1f32]),
         }
     }
 }
